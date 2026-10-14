@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 3000;
 let qrImageBase64 = '';
 let isReady = false;
 
+// Cliente optimizado para entornos de baja memoria (512MB RAM)
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -27,14 +28,20 @@ const client = new Client({
       '--no-first-run',
       '--no-zygote',
       '--single-process',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--renderer-process-limit=1',
+      '--disable-extensions',
+      '--disable-component-extensions-with-background-pages',
+      '--disable-default-apps',
+      '--mute-audio',
+      '--no-default-browser-check',
+      '--autoplay-policy=user-gesture-required'
     ]
   }
 });
 
-// Guardar QR como imagen Base64 para mostrar en la web
 client.on('qr', async (qr) => {
-  console.log('Nuevo código QR generado. Disponible en la página web.');
+  console.log('Nuevo código QR generado.');
   try {
     qrImageBase64 = await QRCode.toDataURL(qr);
   } catch (err) {
@@ -57,7 +64,6 @@ client.on('auth_failure', () => {
 
 client.initialize();
 
-// Vista web para escanear el QR fácilmente
 app.get('/', (req, res) => {
   if (isReady) {
     return res.send('<h1 style="color:green;text-align:center;margin-top:50px;font-family:sans-serif;">✅ WhatsApp está CONECTADO y activo.</h1>');
