@@ -106,9 +106,6 @@ app.post('/enviar-whatsapp', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
-});
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
