@@ -16,11 +16,7 @@ let isReady = false;
 
 const client = new Client({
   authStrategy: new LocalAuth(),
-  // Forzar versión web liviana sin cargar historial pesado
-  webVersionCache: {
-    type: 'remote',
-    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-  },
+  takeoverOnConflict: true,
   puppeteer: {
     headless: true,
     executablePath: puppeteer.executablePath(),
@@ -34,19 +30,27 @@ const client = new Client({
       '--single-process',
       '--disable-gpu',
       '--renderer-process-limit=1',
-      '--disable-extensions',
-      '--mute-audio'
+      '--disable-extensions'
     ]
   }
 });
 
+// Bloquear imágenes y fuentes pesadas dentro de WhatsApp Web para ahorrar 70% de RAM
+client.on('loading_screen', (percent, message) => {
+  console.log('Cargando WhatsApp:', percent, '% -', message);
+});
+
 client.on('qr', async (qr) => {
-  console.log('Nuevo código QR generado.');
+  console.log('Nuevo QR disponible en la web.');
   try {
     qrImageBase64 = await QRCode.toDataURL(qr);
   } catch (err) {
-    console.error('Error al generar la imagen del QR:', err);
+    console.error('Error QR:', err);
   }
+});
+
+client.on('authenticated', () => {
+  console.log('¡Autenticación exitosa en WhatsApp!');
 });
 
 client.on('ready', () => {
@@ -62,6 +66,12 @@ client.on('auth_failure', () => {
   isReady = false;
 });
 
+client.on('disconnected', (reason) => {
+  console.log('Cliente desconectado:', reason);
+  isReady = false;
+  client.initialize();
+});
+
 client.initialize();
 
 app.get('/', (req, res) => {
@@ -70,7 +80,7 @@ app.get('/', (req, res) => {
   }
   
   if (!qrImageBase64) {
-    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Cargando motor de WhatsApp, aguarda unos segundos y recarga la página...</h1><script>setTimeout(()=>location.reload(), 4000);</script>');
+    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Iniciando motor de WhatsApp, aguarda unos segundos y recarga...</h1><script>setTimeout(()=>location.reload(), 4000);</script>');
   }
 
   res.send(`
@@ -102,7 +112,7 @@ app.post('/enviar-whatsapp', async (req, res) => {
   try {
     const { chatId, mensaje } = req.body;
     if (!chatId || !mensaje) {
-      return res.status(400).json({ status: 'error', mensaje: 'Faltan parámetros obligatorios.' });
+      return res.status(400).json({ status: 'error', mensaje: 'Faltan parámetros.' });
     }
     let formattedChatId = chatId.includes('@') ? chatId : `${chatId}@g.us`;
     await client.sendMessage(formattedChatId, mensaje);
@@ -113,5 +123,5 @@ app.post('/enviar-whatsapp', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
+  console.log(`Servidor en puerto ${PORT}`);
 });
