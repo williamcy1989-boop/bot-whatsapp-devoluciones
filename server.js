@@ -30,13 +30,13 @@ const client = new Client({
   }
 });
 
-// Guardar QR como imagen
+// Guardar QR como imagen Base64 para mostrar en el navegador
 client.on('qr', async (qr) => {
-  console.log('Nuevo QR generado. Accede a la URL para escanearlo.');
+  console.log('Nuevo código QR generado. Disponible en el navegador.');
   try {
     qrImageBase64 = await QRCode.toDataURL(qr);
   } catch (err) {
-    console.error('Error al generar imagen QR:', err);
+    console.error('Error al generar la imagen del QR:', err);
   }
 });
 
@@ -49,33 +49,38 @@ client.on('ready', () => {
 });
 
 client.on('auth_failure', () => {
+  console.error('Error de autenticación');
   isReady = false;
 });
 
 client.initialize();
 
-// Ruta visual para escanear el QR desde el navegador
+// Interfaz web limpia para ver el QR
 app.get('/', (req, res) => {
   if (isReady) {
-    return res.send('<h1 style="color:green;text-align:center;margin-top:50px;">✅ WhatsApp está CONECTADO y activo.</h1>');
+    return res.send('<h1 style="color:green;text-align:center;margin-top:50px;font-family:sans-serif;">✅ WhatsApp está CONECTADO y activo.</h1>');
   }
   
   if (!qrImageBase64) {
-    return res.send('<h1 style="text-align:center;margin-top:50px;">⏳ Generando código QR, recarga la página en unos segundos...</h1><script>setTimeout(()=>location.reload(), 3000);</script>');
+    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Cargando motor de WhatsApp, aguarda unos segundos y recarga...</h1><script>setTimeout(()=>location.reload(), 4000);</script>');
   }
 
   res.send(`
     <div style="text-align:center;margin-top:30px;font-family:sans-serif;">
       <h1>Vincular WhatsApp del Bot</h1>
-      <p>Escanea este código QR con la cámara de WhatsApp de tu celular:</p>
-      <img src="${qrImageBase64}" style="width:300px;height:300px;border:2px solid #000;" />
-      <p><i>Esta página se actualizará automáticamente al conectarse.</i></p>
+      <p>Escanea este código QR desde tu celular (WhatsApp > Dispositivos vinculados):</p>
+      <div style="margin: 20px 0;">
+        <img src="${qrImageBase64}" style="width:280px;height:280px;border:3px solid #075e54;border-radius:10px;padding:10px;background:#fff;" />
+      </div>
+      <p style="color:#666;"><i>La página se actualizará automáticamente una vez vinculado.</i></p>
     </div>
     <script>
       setInterval(async () => {
-        let res = await fetch('/status');
-        let data = await res.json();
-        if(data.ready) location.reload();
+        try {
+          let res = await fetch('/status');
+          let data = await res.json();
+          if(data.ready) location.reload();
+        } catch(e) {}
       }, 3000);
     </script>
   `);
@@ -89,7 +94,7 @@ app.post('/enviar-whatsapp', async (req, res) => {
   try {
     const { chatId, mensaje } = req.body;
     if (!chatId || !mensaje) {
-      return res.status(400).json({ status: 'error', mensaje: 'Faltan parámetros.' });
+      return res.status(400).json({ status: 'error', mensaje: 'Faltan parámetros obligatorios.' });
     }
     let formattedChatId = chatId.includes('@') ? chatId : `${chatId}@g.us`;
     await client.sendMessage(formattedChatId, mensaje);
@@ -100,5 +105,5 @@ app.post('/enviar-whatsapp', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor escuchando en puerto ${PORT}`);
+  console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
