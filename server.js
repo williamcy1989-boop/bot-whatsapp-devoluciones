@@ -35,13 +35,8 @@ const client = new Client({
   }
 });
 
-// Bloquear imágenes y fuentes pesadas dentro de WhatsApp Web para ahorrar 70% de RAM
-client.on('loading_screen', (percent, message) => {
-  console.log('Cargando WhatsApp:', percent, '% -', message);
-});
-
 client.on('qr', async (qr) => {
-  console.log('Nuevo QR disponible en la web.');
+  console.log('>>> NUEVO QR GENERADO EN ESPERA DE ESCANEO <<<');
   try {
     qrImageBase64 = await QRCode.toDataURL(qr);
   } catch (err) {
@@ -50,12 +45,12 @@ client.on('qr', async (qr) => {
 });
 
 client.on('authenticated', () => {
-  console.log('¡Autenticación exitosa en WhatsApp!');
+  console.log('>>> AUTENTICACIÓN EXITOSA EN WHATSAPP <<<');
 });
 
 client.on('ready', () => {
   console.log('==================================================');
-  console.log('¡CLIENTE DE WHATSAPP CONECTADO Y LISTO!');
+  console.log('¡BOT WHATSAPP TOTALMENTE LISTO Y CONECTADO!');
   console.log('==================================================');
   isReady = true;
   qrImageBase64 = '';
@@ -66,12 +61,6 @@ client.on('auth_failure', () => {
   isReady = false;
 });
 
-client.on('disconnected', (reason) => {
-  console.log('Cliente desconectado:', reason);
-  isReady = false;
-  client.initialize();
-});
-
 client.initialize();
 
 app.get('/', (req, res) => {
@@ -80,7 +69,7 @@ app.get('/', (req, res) => {
   }
   
   if (!qrImageBase64) {
-    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Iniciando motor de WhatsApp, aguarda unos segundos y recarga...</h1><script>setTimeout(()=>location.reload(), 4000);</script>');
+    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Iniciando motor de WhatsApp... aguarda unos segundos y recarga.</h1><script>setTimeout(()=>location.reload(), 5000);</script>');
   }
 
   res.send(`
@@ -123,5 +112,5 @@ app.post('/enviar-whatsapp', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor en puerto ${PORT}`);
+  console.log(`Servidor iniciado en puerto ${PORT}`);
 });
