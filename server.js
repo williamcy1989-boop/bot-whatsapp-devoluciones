@@ -10,7 +10,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 3000;
 
-// Inicialización del cliente de WhatsApp adaptado para entornos en la nube (Render)
+// Inicialización del cliente de WhatsApp
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -27,7 +27,7 @@ const client = new Client({
   }
 });
 
-// Generación de código QR en la consola de Render
+// Generación de código QR en consola
 client.on('qr', (qr) => {
   console.log('==================================================');
   console.log('ESCANEA ESTE CÓDIGO QR CON TU WHATSAPP:');
@@ -64,7 +64,6 @@ app.post('/enviar-whatsapp', async (req, res) => {
       });
     }
 
-    // Formatear ID si es necesario (para grupos o números)
     let formattedChatId = chatId.includes('@') ? chatId : `${chatId}@g.us`;
 
     console.log(`Enviando mensaje a ${formattedChatId}...`);
