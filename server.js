@@ -14,9 +14,13 @@ const PORT = process.env.PORT || 3000;
 let qrImageBase64 = '';
 let isReady = false;
 
-// Cliente optimizado para entornos de baja memoria (512MB RAM)
 const client = new Client({
   authStrategy: new LocalAuth(),
+  // Forzar versión web liviana sin cargar historial pesado
+  webVersionCache: {
+    type: 'remote',
+    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+  },
   puppeteer: {
     headless: true,
     executablePath: puppeteer.executablePath(),
@@ -31,11 +35,7 @@ const client = new Client({
       '--disable-gpu',
       '--renderer-process-limit=1',
       '--disable-extensions',
-      '--disable-component-extensions-with-background-pages',
-      '--disable-default-apps',
-      '--mute-audio',
-      '--no-default-browser-check',
-      '--autoplay-policy=user-gesture-required'
+      '--mute-audio'
     ]
   }
 });
