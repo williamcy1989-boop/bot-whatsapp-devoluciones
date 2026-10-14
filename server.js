@@ -10,7 +10,6 @@ app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 3000;
 
-// Inicialización del cliente de WhatsApp
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -22,12 +21,12 @@ const client = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
+      '--single-process',
       '--disable-gpu'
     ]
   }
 });
 
-// Generación de código QR en consola
 client.on('qr', (qr) => {
   console.log('==================================================');
   console.log('ESCANEA ESTE CÓDIGO QR CON TU WHATSAPP:');
@@ -41,49 +40,26 @@ client.on('ready', () => {
   console.log('==================================================');
 });
 
-client.on('auth_failure', (msg) => {
-  console.error('Error de autenticación en WhatsApp:', msg);
-});
-
 client.initialize();
 
-// Ruta de estado
 app.get('/', (req, res) => {
-  res.status(200).send('Servidor WhatsApp en Render activo.');
+  res.status(200).send('Servidor activo');
 });
 
-// Endpoint para recibir la notificación desde Google Apps Script
 app.post('/enviar-whatsapp', async (req, res) => {
   try {
     const { chatId, mensaje } = req.body;
-
     if (!chatId || !mensaje) {
-      return res.status(400).json({
-        status: 'error',
-        mensaje: 'Faltan parámetros obligatorios: chatId o mensaje.'
-      });
+      return res.status(400).json({ status: 'error', mensaje: 'Faltan parámetros.' });
     }
-
     let formattedChatId = chatId.includes('@') ? chatId : `${chatId}@g.us`;
-
-    console.log(`Enviando mensaje a ${formattedChatId}...`);
     await client.sendMessage(formattedChatId, mensaje);
-
-    return res.status(200).json({
-      status: 'ok',
-      mensaje: 'Notificación enviada exitosamente a WhatsApp'
-    });
-
+    return res.status(200).json({ status: 'ok', mensaje: 'Enviado correctamente.' });
   } catch (error) {
-    console.error('Error al enviar el mensaje por WhatsApp:', error);
-    return res.status(500).json({
-      status: 'error',
-      mensaje: 'Error interno al enviar mensaje',
-      error: error.message
-    });
+    return res.status(500).json({ status: 'error', error: error.message });
   }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor HTTP iniciado en puerto ${PORT}`);
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
