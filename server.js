@@ -1,8 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
-const puppeteer = require('puppeteer');
+const pino = require('pino');
 
 const app = express();
 app.use(cors());
@@ -13,55 +13,50 @@ const PORT = process.env.PORT || 3000;
 
 let qrImageBase64 = '';
 let isReady = false;
+let sock;
 
-const client = new Client({
-  authStrategy: new LocalAuth(),
-  takeoverOnConflict: true,
-  puppeteer: {
-    headless: true,
-    executablePath: puppeteer.executablePath(),
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-gpu',
-      '--renderer-process-limit=1',
-      '--disable-extensions'
-    ]
-  }
-});
+async function connectToWhatsApp() {
+  const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info');
 
-client.on('qr', async (qr) => {
-  console.log('>>> NUEVO QR GENERADO EN ESPERA DE ESCANEO <<<');
-  try {
-    qrImageBase64 = await QRCode.toDataURL(qr);
-  } catch (err) {
-    console.error('Error QR:', err);
-  }
-});
+  sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: false,
+    logger: pino({ level: 'silent' }),
+    browser: ['Bot Devoluciones', 'Chrome', '1.0.0']
+  });
 
-client.on('authenticated', () => {
-  console.log('>>> AUTENTICACIÓN EXITOSA EN WHATSAPP <<<');
-});
+  sock.ev.on('creds.update', saveCreds);
 
-client.on('ready', () => {
-  console.log('==================================================');
-  console.log('¡BOT WHATSAPP TOTALMENTE LISTO Y CONECTADO!');
-  console.log('==================================================');
-  isReady = true;
-  qrImageBase64 = '';
-});
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-client.on('auth_failure', () => {
-  console.error('Error de autenticación');
-  isReady = false;
-});
+    if (qr) {
+      console.log('>>> NUEVO CÓDIGO QR GENERADO <<<');
+      try {
+        qrImageBase64 = await QRCode.toDataURL(qr);
+      } catch (err) {
+        console.error('Error generando imagen QR:', err);
+      }
+    }
 
-client.initialize();
+    if (connection === 'close') {
+      const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+      console.log('Conexión cerrada. Reconectando:', shouldReconnect);
+      isReady = false;
+      if (shouldReconnect) {
+        setTimeout(connectToWhatsApp, 3000);
+      }
+    } else if (connection === 'open') {
+      console.log('==================================================');
+      console.log('¡BOT DE WHATSAPP CONECTADO Y LISTO!');
+      console.log('==================================================');
+      isReady = true;
+      qrImageBase64 = '';
+    }
+  });
+}
+
+connectToWhatsApp();
 
 app.get('/', (req, res) => {
   if (isReady) {
@@ -69,7 +64,7 @@ app.get('/', (req, res) => {
   }
   
   if (!qrImageBase64) {
-    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Iniciando motor de WhatsApp... aguarda unos segundos y recarga.</h1><script>setTimeout(()=>location.reload(), 5000);</script>');
+    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Cargando motor ultra-liviano de WhatsApp... recargando página.</h1><script>setTimeout(()=>location.reload(), 4000);</script>');
   }
 
   res.send(`
@@ -101,10 +96,18 @@ app.post('/enviar-whatsapp', async (req, res) => {
   try {
     const { chatId, mensaje } = req.body;
     if (!chatId || !mensaje) {
-      return res.status(400).json({ status: 'error', mensaje: 'Faltan parámetros.' });
+      return res.status(400).json({ status: 'error', mensaje: 'Faltan parámetros obligatorios (chatId, mensaje).' });
     }
-    let formattedChatId = chatId.includes('@') ? chatId : `${chatId}@g.us`;
-    await client.sendMessage(formattedChatId, mensaje);
+    if (!isReady) {
+      return res.status(503).json({ status: 'error', mensaje: 'El servicio de WhatsApp no está listo aún.' });
+    }
+
+    let formattedChatId = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
+    if (chatId.includes('-') && !chatId.includes('@')) {
+      formattedChatId = `${chatId}@g.us`;
+    }
+
+    await sock.sendMessage(formattedChatId, { text: mensaje });
     return res.status(200).json({ status: 'ok', mensaje: 'Enviado correctamente.' });
   } catch (error) {
     return res.status(500).json({ status: 'error', error: error.message });
@@ -112,5 +115,5 @@ app.post('/enviar-whatsapp', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor iniciado en puerto ${PORT}`);
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
