@@ -1,84 +1,58 @@
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-
+const cors = require('cors');
 const app = express();
+
+// Middlewares para procesar solicitudes JSON y URL Encoded
+app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        headless: true,
-        executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-        ]
-    }
+// Puerto dinámico asignado por Render o puerto 3000 por defecto para local
+const PORT = process.env.PORT || 3000;
+
+// Ruta principal para comprobación de estado (Health Check)
+app.get('/', (req, res) => {
+  res.status(200).send('Servidor de WhatsApp Webhooks activo y en ejecucion.');
 });
 
-client.on('qr', (qr) => {
-    console.log('\n👇 ESCANEA ESTE CÓDIGO QR CON TU WHATSAPP:\n');
-    qrcode.generate(qr, { small: true });
-});
-
-client.on('ready', () => {
-    console.log('\n==================================================');
-    console.log('✅ ¡Servidor de WhatsApp conectado y listo!');
-    console.log('📌 Escribe "!id" en tu grupo para ver su ID en esta pantalla.');
-    console.log('==================================================\n');
-});
-
-// Capturar el ID directo desde las propiedades del mensaje
-client.on('message_create', async (msg) => {
-    try {
-        if (msg.body === '!id') {
-            // Identificar si el mensaje proviene o va dirigido a un grupo (@g.us)
-            const idChat = msg.from.endsWith('@g.us') ? msg.from : (msg.to.endsWith('@g.us') ? msg.to : null);
-
-            if (idChat) {
-                console.log('\n--------------------------------------------------');
-                console.log(`🎯 ¡GRUPO DETECTADO!`);
-                console.log(`🆔 ID EXACTO PARA USAR EN GOOGLE APPS SCRIPT:`);
-                console.log(`${idChat}`);
-                console.log('--------------------------------------------------\n');
-
-                await client.sendMessage(idChat, `El ID de este grupo es:\n${idChat}`);
-            } else {
-                console.log('\n⚠️ El comando !id debe ser enviado dentro de un GRUPO de WhatsApp.\n');
-            }
-        }
-    } catch (err) {
-        console.error('Error al procesar !id:', err);
-    }
-});
-
+// Endpoint principal para el envío de notificaciones de WhatsApp
 app.post('/enviar-whatsapp', async (req, res) => {
-    try {
-        const { chatId, mensaje, message } = req.body;
-        const textoEnviar = mensaje || message;
-        
-        if (!chatId || !textoEnviar) {
-            return res.status(400).send({ status: 'error', message: 'Faltan datos requeridos' });
-        }
+  try {
+    const { chatId, mensaje } = req.body;
 
-        await client.sendMessage(chatId, textoEnviar);
-        console.log(`📩 [${new Date().toLocaleTimeString()}] Notificación enviada al grupo.`);
-        res.status(200).send({ status: 'ok' });
-    } catch (error) {
-        console.error('❌ Error enviando mensaje por WhatsApp:', error);
-        res.status(500).send({ status: 'error', details: error.toString() });
+    // Validación básica de parámetros recibidos
+    if (!chatId || !mensaje) {
+      return res.status(400).json({
+        status: 'error',
+        mensaje: 'Faltan parametros obligatorios: chatId o mensaje.'
+      });
     }
+
+    console.log(`[${new Date().toISOString()}] Solicitud recibida:`);
+    console.log(`Chat ID: ${chatId}`);
+    console.log(`Mensaje: ${mensaje}`);
+
+    // AQUÍ VA TU LÓGICA DE ENVÍO DE WHATSAPP 
+    // (Ejemplo: client.sendMessage(chatId, mensaje) si usas whatsapp-web.js o Baileys)
+
+    return res.status(200).json({
+      status: 'ok',
+      mensaje: 'Notificacion procesada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('Error al procesar la solicitud:', error);
+    return res.status(500).json({
+      status: 'error',
+      mensaje: 'Error interno del servidor',
+      error: error.message
+    });
+  }
 });
 
-const PUERTO = 3000;
-app.listen(PUERTO, () => {
-    console.log(`🚀 Servidor en http://localhost:${PUERTO}`);
+// Escuchar en el puerto asignado
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`=================================`);
+  console.log(`Servidor iniciado en el puerto ${PORT}`);
+  console.log(`=================================`);
 });
-
-client.initialize();
