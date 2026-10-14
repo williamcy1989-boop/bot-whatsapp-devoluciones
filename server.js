@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
+const puppeteer = require('puppeteer');
 
 const app = express();
 app.use(cors());
@@ -17,6 +18,7 @@ const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
+    executablePath: puppeteer.executablePath(),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -30,9 +32,9 @@ const client = new Client({
   }
 });
 
-// Guardar QR como imagen Base64 para mostrar en el navegador
+// Guardar QR como imagen Base64 para mostrar en la web
 client.on('qr', async (qr) => {
-  console.log('Nuevo código QR generado. Disponible en el navegador.');
+  console.log('Nuevo código QR generado. Disponible en la página web.');
   try {
     qrImageBase64 = await QRCode.toDataURL(qr);
   } catch (err) {
@@ -55,14 +57,14 @@ client.on('auth_failure', () => {
 
 client.initialize();
 
-// Interfaz web limpia para ver el QR
+// Vista web para escanear el QR fácilmente
 app.get('/', (req, res) => {
   if (isReady) {
     return res.send('<h1 style="color:green;text-align:center;margin-top:50px;font-family:sans-serif;">✅ WhatsApp está CONECTADO y activo.</h1>');
   }
   
   if (!qrImageBase64) {
-    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Cargando motor de WhatsApp, aguarda unos segundos y recarga...</h1><script>setTimeout(()=>location.reload(), 4000);</script>');
+    return res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">⏳ Cargando motor de WhatsApp, aguarda unos segundos y recarga la página...</h1><script>setTimeout(()=>location.reload(), 4000);</script>');
   }
 
   res.send(`
@@ -104,6 +106,9 @@ app.post('/enviar-whatsapp', async (req, res) => {
   }
 });
 
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor escuchando en el puerto ${PORT}`);
+});
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
